@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: windows-latest 
+    runs-on: windows-latest # Đã sửa thành Windows, Rất tốt!
 
     steps:
       - name: Checkout code
@@ -17,16 +17,17 @@ jobs:
       - name: Cài đặt .NET SDK
         uses: actions/setup-dotnet@v4
         with:
+          # Đảm bảo bạn đang sử dụng 8.0.x vì .NET 9.0 là Pre-release
           dotnet-version: 8.0.x    
 
       - name: Restore packages
-        
-        run: dotnet restore Xương_QLTV.sln 
+        # SỬA: CHỈ CẦN CHẠY TRONG THƯ MỤC GỐC
+        run: dotnet restore 
 
       - name: Build dự án
-       
-        run: dotnet build Xương_QLTV.sln --no-restore -c Release
+        # SỬA: CHỈ CẦN CHẠY TRONG THƯ MỤC GỐC
+        run: dotnet build --no-restore -c Release
 
       - name: Chạy toàn bộ Unit Test
-    
-        run: dotnet test Xương_QLTV.sln --no-build -c Release --no-restore --verbosity normal
+        # SỬA: CHỈ CẦN CHẠY TRONG THƯ MỤC GỐC
+        run: dotnet test --no-build -c Release --no-restore --verbosity normal
