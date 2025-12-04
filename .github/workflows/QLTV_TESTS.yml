@@ -1,4 +1,4 @@
-name: CI
+name: .NET CI - QLTV
 
 on:
   push:
@@ -9,15 +9,18 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    name: Build & Test (.NET 8)
 
-       steps:
-    - name: Checkout code
+    steps:
+    - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Cần nếu bạn dùng git history trong test
 
-    - name: Setup .NET
+    - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'    # Thay bằng phiên bản bạn đang dùng: 6.0.x, 7.0.x, 8.0.x, 9.0.x
+        dotnet-version: 8.0.x   # Đổi thành 6.0.x / 7.0.x / 9.0.x nếu bạn dùng phiên bản khác
 
     - name: Restore dependencies
       run: dotnet restore
@@ -27,21 +30,33 @@ jobs:
 
     - name: Run tests
       run: dotnet test --no-build --configuration Release --verbosity normal
-      # Nếu muốn xuất coverage (tuỳ chọn)
-      # run: dotnet test --no-build --configuration Release 
-      #       --collect:"XPlat Code Coverage" 
-      #       --settings coverlet.runsettings
+      env:
+        # Nếu test của bạn cần connection string đặc biệt (ví dụ dùng InMemory hoặc SQLite)
+        ConnectionStrings__DefaultConnection: "Data Source=DESKTOP-G2GFTFM;Initial Catalog=PRO_QuanLyThuVien;Integrated Security=True;Encrypt=True;Trust Server Certificate=True"
 
-    # (Tuỳ chọn) Upload coverage to Codecov
-    # - name: Upload coverage to Codecov
-    #   uses: codecov/codecov-action@v4
+    # Tùy chọn: Tạo báo cáo coverage (rất đẹp khi gắn badge)
+    - name: Generate code coverage
+      run: |
+        dotnet test --no-build --configuration Release \
+          --collect:"XPlat Code Coverage" \
+          --settings .github/coverage.runsettings
 
-    - name: Publish artifact (optional)
+    - name: Upload coverage to Codecov (tuỳ chọn)
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage.cobertura.xml
+        fail_ci_if_error: true
+
+    # Tùy chọn: Publish artifact để download file build
+    - name: Publish application
       if: success()
-      run: dotnet publish --configuration Release --output ./publish
+      run: dotnet publish "QLTV.Web.csproj" --configuration Release --output ./publish
+      # Thay "QLTV.Web.csproj" bằng tên project startup chính của bạn
 
-    - name: Upload build artifact
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: publish-output
+        name: QLTV-published-app
         path: ./publish
+        retention-days: 7
