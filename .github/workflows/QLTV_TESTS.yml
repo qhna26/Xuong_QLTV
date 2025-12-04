@@ -1,4 +1,4 @@
-name: Quản Lý Thư Viện - Tự động Build & Test
+name: CI
 
 on:
   push:
@@ -8,26 +8,52 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: windows-latest # Đã sửa thành Windows, Rất tốt!
+    runs-on: ubuntu-latest
+
+    # Sử dụng SQL Server hoặc PostgreSQL nếu cần, ở đây dùng SQLite in-memory cho test nhanh
+    services:
+      # (Tuỳ chọn) Nếu dự án dùng SQL Server
+      # mssql:
+      #   image: mcr.microsoft.com/mssql/server:2022-latest
+      #   env:
+      #     SA_PASSWORD: YourStrong@Passw0rd
+      #     ACCEPT_EULA: Y
+      #   ports:
+      #     - 1433:1433
+      #   options: --health-cmd="sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q 'SELECT 1'" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Cài đặt .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          # Đảm bảo bạn đang sử dụng 8.0.x vì .NET 9.0 là Pre-release
-          dotnet-version: 8.0.x    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'    # Thay bằng phiên bản bạn đang dùng: 6.0.x, 7.0.x, 8.0.x, 9.0.x
 
-      - name: Restore packages
-        # SỬA: CHỈ CẦN CHẠY TRONG THƯ MỤC GỐC
-        run: dotnet restore 
+    - name: Restore dependencies
+      run: dotnet restore
 
-      - name: Build dự án
-        # SỬA: CHỈ CẦN CHẠY TRONG THƯ MỤC GỐC
-        run: dotnet build --no-restore -c Release
+    - name: Build solution
+      run: dotnet build --no-restore --configuration Release
 
-      - name: Chạy toàn bộ Unit Test
-        # SỬA: CHỈ CẦN CHẠY TRONG THƯ MỤC GỐC
-        run: dotnet test --no-build -c Release --no-restore --verbosity normal
+    - name: Run tests
+      run: dotnet test --no-build --configuration Release --verbosity normal
+      # Nếu muốn xuất coverage (tuỳ chọn)
+      # run: dotnet test --no-build --configuration Release 
+      #       --collect:"XPlat Code Coverage" 
+      #       --settings coverlet.runsettings
+
+    # (Tuỳ chọn) Upload coverage to Codecov
+    # - name: Upload coverage to Codecov
+    #   uses: codecov/codecov-action@v4
+
+    - name: Publish artifact (optional)
+      if: success()
+      run: dotnet publish --configuration Release --output ./publish
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: publish-output
+        path: ./publish
