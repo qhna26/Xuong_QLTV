@@ -14,49 +14,51 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x   # bạn đang dùng .NET 8
+        dotnet-version: 8.0.x
 
-    # BƯỚC QUAN TRỌNG: Fix lỗi net8.0-windows (99% dự án QLTV VN đều dính cái này)
-    - name: Fix Windows-specific target frameworks
+    # BƯỚC 1: Fix netX.0-windows → netX.0
+    - name: Fix Windows target frameworks
       run: |
         find . -type f -name "*.csproj" -exec sed -i 's/net8.0-windows/net8.0/g' {} \;
         find . -type f -name "*.csproj" -exec sed -i 's/net7.0-windows/net7.0/g' {} \;
         find . -type f -name "*.csproj" -exec sed -i 's/net6.0-windows/net6.0/g' {} \;
 
-    - name: Restore dependencies
+    # BƯỚC 2: Loại bỏ hoàn toàn các project WinForms/GUI khỏi restore & build (chỉ CI cần Web + Test)
+    - name: Exclude WinForms/GUI projects from CI
+      run: |
+        echo "Đang loại bỏ các project Windows Forms khỏi CI..."
+        # Đánh dấu các project GUI không cần build trên Linux
+        find . -name "*.csproj" -exec grep -l "Microsoft.NET.Sdk.WindowsDesktop\|WinForms\|WPF\|DataVisualization" {} \; | while read file; do
+          echo "→ Loại bỏ tạm thời: $file"
+          mv "$file" "$file.bak"
+        done
+
+    - name: Restore dependencies (chỉ các project còn lại)
       run: dotnet restore
+
+    # Khôi phục lại file .csproj sau khi restore xong (để không ảnh hưởng local)
+    - name: Restore excluded .csproj files
+      if: always()
+      run: |
+        find . -name "*.csproj.bak" -exec sh -c 'mv "$0" "${0%.bak}"' {} \;
 
     - name: Build solution
       run: dotnet build --no-restore --configuration Release
 
-    - name: Run tests (dùng SQLite in-memory hoặc file tạm → không cần SQL Server thật)
+    - name: Run tests
       run: dotnet test --no-build --configuration Release --verbosity normal
       env:
-        # RẤT QUAN TRỌNG: Đừng dùng connection string Windows nữa!
-        # Dùng SQLite tạm hoặc InMemory để test chạy được trên Linux
         ConnectionStrings__DefaultConnection: "Data Source=QLTV_Test.db;Mode=ReadWrite;Cache=Shared"
 
-    # (Tùy chọn) Code coverage – để sau khi CI xanh rồi bật cũng được
-    # - name: Generate code coverage
-    #   run: |
-    #     dotnet test --no-build --configuration Release \
-    #       --collect:"XPlat Code Coverage" \
-    #       --settings .github/coverage.runsettings
-
     - name: Publish Web Application
-      if: success()
-      run: dotnet publish QLTV.Web/QLTV.Web.csproj --configuration Release --output ./publish
-      # Đường dẫn chính xác đến project Web của bạn (thường là QLTV.Web/QLTV.Web.csproj)
+      run: dotnet publish QLTV.Web/QLTV.Web.csproj -c Release -o ./publish --no-restore
 
-    - name: Upload published artifact
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: QLTV-WebApp
         path: ./publish
-        retention-days: 7
