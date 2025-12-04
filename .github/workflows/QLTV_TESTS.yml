@@ -10,19 +10,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    # Sử dụng SQL Server hoặc PostgreSQL nếu cần, ở đây dùng SQLite in-memory cho test nhanh
-    services:
-      # (Tuỳ chọn) Nếu dự án dùng SQL Server
-      # mssql:
-      #   image: mcr.microsoft.com/mssql/server:2022-latest
-      #   env:
-      #     SA_PASSWORD: YourStrong@Passw0rd
-      #     ACCEPT_EULA: Y
-      #   ports:
-      #     - 1433:1433
-      #   options: --health-cmd="sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q 'SELECT 1'" --health-interval=10s --health-timeout=5s --health-retries=3
-
-    steps:
+       steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
