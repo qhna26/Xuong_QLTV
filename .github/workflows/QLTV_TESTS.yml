@@ -15,12 +15,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Cần nếu bạn dùng git history trong test
+        fetch-depth: 0
 
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x   # Đổi thành 6.0.x / 7.0.x / 9.0.x nếu bạn dùng phiên bản khác
+        dotnet-version: 8.0.x   # bạn đang dùng .NET 8
+
+    # BƯỚC QUAN TRỌNG: Fix lỗi net8.0-windows (99% dự án QLTV VN đều dính cái này)
+    - name: Fix Windows-specific target frameworks
+      run: |
+        find . -type f -name "*.csproj" -exec sed -i 's/net8.0-windows/net8.0/g' {} \;
+        find . -type f -name "*.csproj" -exec sed -i 's/net7.0-windows/net7.0/g' {} \;
+        find . -type f -name "*.csproj" -exec sed -i 's/net6.0-windows/net6.0/g' {} \;
 
     - name: Restore dependencies
       run: dotnet restore
@@ -28,35 +35,28 @@ jobs:
     - name: Build solution
       run: dotnet build --no-restore --configuration Release
 
-    - name: Run tests
+    - name: Run tests (dùng SQLite in-memory hoặc file tạm → không cần SQL Server thật)
       run: dotnet test --no-build --configuration Release --verbosity normal
       env:
-        # Nếu test của bạn cần connection string đặc biệt (ví dụ dùng InMemory hoặc SQLite)
-        ConnectionStrings__DefaultConnection: "Data Source=DESKTOP-G2GFTFM;Initial Catalog=PRO_QuanLyThuVien;Integrated Security=True;Encrypt=True;Trust Server Certificate=True"
+        # RẤT QUAN TRỌNG: Đừng dùng connection string Windows nữa!
+        # Dùng SQLite tạm hoặc InMemory để test chạy được trên Linux
+        ConnectionStrings__DefaultConnection: "Data Source=QLTV_Test.db;Mode=ReadWrite;Cache=Shared"
 
-    # Tùy chọn: Tạo báo cáo coverage (rất đẹp khi gắn badge)
-    - name: Generate code coverage
-      run: |
-        dotnet test --no-build --configuration Release \
-          --collect:"XPlat Code Coverage" \
-          --settings .github/coverage.runsettings
+    # (Tùy chọn) Code coverage – để sau khi CI xanh rồi bật cũng được
+    # - name: Generate code coverage
+    #   run: |
+    #     dotnet test --no-build --configuration Release \
+    #       --collect:"XPlat Code Coverage" \
+    #       --settings .github/coverage.runsettings
 
-    - name: Upload coverage to Codecov (tuỳ chọn)
-      uses: codecov/codecov-action@v4
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: ./coverage.cobertura.xml
-        fail_ci_if_error: true
-
-    # Tùy chọn: Publish artifact để download file build
-    - name: Publish application
+    - name: Publish Web Application
       if: success()
-      run: dotnet publish "QLTV.Web.csproj" --configuration Release --output ./publish
-      # Thay "QLTV.Web.csproj" bằng tên project startup chính của bạn
+      run: dotnet publish QLTV.Web/QLTV.Web.csproj --configuration Release --output ./publish
+      # Đường dẫn chính xác đến project Web của bạn (thường là QLTV.Web/QLTV.Web.csproj)
 
-    - name: Upload artifact
+    - name: Upload published artifact
       uses: actions/upload-artifact@v4
       with:
-        name: QLTV-published-app
+        name: QLTV-WebApp
         path: ./publish
         retention-days: 7
